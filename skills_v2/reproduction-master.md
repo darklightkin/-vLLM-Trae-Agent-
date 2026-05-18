@@ -1,61 +1,61 @@
 # reproduction-master v2
 
-## 目标
+## Goal
 
-作为总控 skill，负责把论文仓库复现任务拆成可审计的阶段，并按需调用小 skill。核心目标是：少交互、可追溯、不伪造、不污染原仓库。
+Act as the master skill for paper-repository reproduction. Split the task into auditable stages and route to sub-skills when needed. The core goals are low interaction, traceability, no fabrication, and no unintended pollution of the original repository.
 
-## 总分结构
+## Master/Sub-Skill Structure
 
-总控只负责阶段、门禁、路由和最终验收；细节交给外接小 skill：
+The master skill owns stages, gates, routing, and final acceptance. Details are delegated to sub-skills:
 
-- `paper-repo-reproduction.md`：仓库扫描、官方入口识别、复现流程。
-- `low-interaction-agent.md`：低交互策略、进度反馈、停止条件。
-- `gpu-and-checkpoint-handling.md`：GPU、CUDA、checkpoint、HuggingFace cache 和数据下载。
-- `metric-extraction.md`：指标抽取、表格生成、结果校验。
+- `paper-repo-reproduction.md`: repository scanning, official entrypoint discovery, and reproduction workflow.
+- `low-interaction-agent.md`: low-interaction strategy, progress updates, and stop conditions.
+- `gpu-and-checkpoint-handling.md`: GPU, CUDA, checkpoints, HuggingFace cache, and dataset download.
+- `metric-extraction.md`: metric extraction, table generation, and result validation.
 
-执行时先读本文件，再按阶段读取对应小 skill。不要一次性把所有 skill 全部展开进 prompt。
+Read this file first, then read the corresponding sub-skill at each stage. Do not expand all skills into the prompt at once.
 
-## 阶段流程
+## Stages
 
 ### 1. Intake
 
-默认 prompt 会提供 GitHub URL。把 GitHub URL 作为任务主入口，本地路径只作为可选覆盖项。
+Assume the prompt provides a GitHub URL. Treat the GitHub URL as the primary task entrypoint. A local path is only an optional override.
 
-确认任务卡中至少包含：
+Confirm that the task card contains at least:
 
-- GitHub URL；
-- 目标 benchmark；
-- 目标模型或方法；
-- 目标指标；
-- 提交文件格式；
-- 是否允许修改原仓库代码。
+- GitHub URL;
+- target benchmark;
+- target model or method;
+- target metrics;
+- submission format;
+- whether source-code edits in the original repository are allowed.
 
-如果没有提供本地路径，根据 GitHub repo 名自动推导：
+If no local path is provided, infer it from the GitHub repository name:
 
 ```text
 <workspace>/model/<repo-name>
 ```
 
-例如：
+Example:
 
 ```text
 GitHub: https://github.com/dgtql/MuQ-Eval
 Local repo: D:\vLLM1\model\MuQ-Eval
 ```
 
-如果缺 benchmark、dataset、checkpoint、metric 等字段，先 clone/读取 README、paper、configs、scripts 自动补齐；只有无法推断时才问用户。
+If benchmark, dataset, checkpoint, or metrics are missing, clone/read README, paper, configs, and scripts first. Ask the user only when the missing field cannot be inferred safely.
 
 ### 2. Repo Bootstrap
 
-从 GitHub URL 启动仓库准备：
+Prepare the repository from the GitHub URL:
 
-1. 解析 repo 名，推导默认本地目录。
-2. 如果本地目录不存在，从 GitHub clone。
-3. 如果本地目录已存在，先检查 `git status --short` 和 `git remote -v`。
-4. 如果 existing remote 与 prompt 的 GitHub URL 不匹配，不要覆盖，停止并报告路径冲突。
-5. 如果 remote 匹配，继续使用已有目录，不要删除用户改动。
+1. Parse the repo name and infer the default local directory.
+2. If the local directory does not exist, clone the GitHub repository.
+3. If it exists, check `git status --short` and `git remote -v`.
+4. If the existing remote does not match the prompt GitHub URL, do not overwrite; stop and report the path conflict.
+5. If the remote matches, keep using the existing directory and do not delete user changes.
 
-推荐命令形态：
+Recommended command shape:
 
 ```powershell
 cd <workspace>
@@ -64,7 +64,7 @@ git clone <github-url> model\<repo-name>
 cd model\<repo-name>
 ```
 
-已存在时：
+If the repo already exists:
 
 ```powershell
 cd <workspace>\model\<repo-name>
@@ -72,7 +72,7 @@ git status --short
 git remote -v
 ```
 
-输出一个最小 inventory：
+Produce a minimal inventory:
 
 | Component | Path / Source | Status |
 | --- | --- | --- |
@@ -86,90 +86,90 @@ git remote -v
 
 ### 3. Environment Gate
 
-先做环境门禁，再跑重任务：
+Run environment checks before expensive jobs:
 
-- Python/conda/venv 是否可用；
-- PyTorch 和 CUDA 是否可用；
-- `nvidia-smi` 是否可用；
-- 磁盘空间是否足够；
-- 代理和 HuggingFace cache 是否合理；
-- 关键包能否 import。
+- Python/conda/venv availability;
+- PyTorch and CUDA availability;
+- `nvidia-smi` availability;
+- free disk space;
+- proxy and HuggingFace cache sanity;
+- import checks for critical packages.
 
-环境不满足时，先给出最小修复动作；不要直接开始长评测。
+If the environment is not ready, report the smallest repair action first. Do not start a long evaluation immediately.
 
 ### 4. Resource Gate
 
-确认数据集和 checkpoint 来自官方 README、paper 或模型仓库。优先使用 HuggingFace 官方接口和 repo-local cache。
+Confirm that dataset and checkpoints come from the official README, paper, release, or model repository. Prefer HuggingFace official APIs and repo-local cache.
 
-必须记录：
+Record:
 
-- dataset ID、split、cache 路径；
-- checkpoint repo/file、下载路径；
-- encoder/backbone 模型 ID；
-- 是否需要 token；
-- 是否只拿到部分 fold。
+- dataset ID, split, and cache path;
+- checkpoint repo/file and local path;
+- encoder/backbone model ID;
+- whether a token is required;
+- whether only part of the fold structure is available.
 
 ### 5. Smoke Gate
 
-先做最小可验证运行，再做目标复现。smoke 可以是：
+Run the smallest verifiable command before target reproduction. A smoke run can be:
 
-- import test；
-- dataset `train[:1]` 或最小 split 加载；
-- checkpoint load；
-- 单 batch forward；
-- 单 fold 或单配置评测。
+- import test;
+- dataset `train[:1]` or minimal split load;
+- checkpoint load;
+- single-batch forward;
+- single-fold or single-config evaluation.
 
-smoke 失败时，进入 bounded repair loop；不要跳到全量运行。
+If smoke fails, enter the bounded repair loop. Do not jump to full evaluation.
 
 ### 6. Target Run
 
-优先运行官方 README 推荐命令。只跑任务要求的模型、benchmark 和 setting，除非任务明确要求 full sweep。
+Prefer the official command recommended by the README. Run only the requested model, benchmark, and setting unless the assignment explicitly requires a full sweep.
 
-如果完整复现缺硬件、数据、checkpoint 或权限，执行最小可验证替代 run，并在 history 中明确写阻塞原因和缺失项。
+If full reproduction is blocked by hardware, data, checkpoint, or permissions, run the smallest valid substitute and clearly record the blocker and missing items in history.
 
 ### 7. Metric Extraction
 
-从真实 logs、JSON、CSV 或 stdout 抽取指标。最终提交表只保留指定表格，不写过程说明。
+Extract metrics from real logs, JSON, CSV, or stdout. The final submission table must contain only the requested table and no process explanation.
 
-严禁把 README 参考值伪装成本地运行结果。
+Never present README reference values as local reproduction results.
 
 ### 8. History and Acceptance
 
-必须生成 conversation history，并包含：
+Generate conversation history with:
 
-- 初始 prompt 和 task card；
-- 读取过的 skill；
-- 实际命令和关键输出；
-- 数据集/checkpoint 来源；
-- 错误、修复和重跑过程；
-- 是否修改原仓库代码；
-- 最终指标和原始结果路径；
-- 人类交互轮次估计。
+- initial prompt and task card;
+- skill files read;
+- actual commands and key outputs;
+- dataset/checkpoint sources;
+- errors, fixes, and reruns;
+- whether original repository code was modified;
+- final metrics and raw result paths;
+- estimated human interaction count.
 
-## 关键门禁
+## Gates
 
-进入下一阶段前必须满足：
+Before moving to the next stage:
 
-- Repo bootstrap 完成后：知道官方 eval entrypoint。
-- Environment gate 完成后：知道用 CPU 还是 CUDA。
-- Resource gate 完成后：知道数据和 checkpoint 是否完整。
-- Smoke gate 完成后：至少有一个最小命令跑通。
-- Target run 完成后：指标可追溯到原始文件。
+- After repo bootstrap: know the official eval entrypoint.
+- After environment gate: know whether CPU or CUDA will be used.
+- After resource gate: know whether dataset and checkpoints are complete.
+- After smoke gate: have at least one minimal command passing.
+- After target run: metrics are traceable to raw files.
 
-## 安全策略
+## Safety
 
-- 默认不修改原仓库代码；若任务允许修改，也必须记录 diff 和原因。
-- 禁止删除源码、配置、checkpoint、原始数据、提交文件和 conversation history。
-- 可以自动清理 workspace 内明显临时的失败缓存，例如 `*.tmp`、`*.incomplete`、`__pycache__/`。
-- 不把 API key、HF token、私有路径凭证写入 prompt、代码、表格或 history。
+- Do not modify original repository code by default. If the task allows edits, record the diff and reason.
+- Do not delete source code, configs, checkpoints, raw data, submission files, or conversation history.
+- You may automatically clean obvious temporary failed-cache files inside the workspace, such as `*.tmp`, `*.incomplete`, and `__pycache__/`.
+- Do not write API keys, HF tokens, or private credentials into prompts, code, tables, or history.
 
-## 输出
+## Output
 
-每个 repo 最终至少生成：
+Each repo must produce at least:
 
 ```text
 submission/<repo>/reproduction.md
 submission/<repo>/conversation_history/history.md
 ```
 
-`reproduction.md` 只放表格；过程、命令、错误、来源全部写入 history。
+`reproduction.md` contains only the table. Process, commands, errors, and provenance go into history.

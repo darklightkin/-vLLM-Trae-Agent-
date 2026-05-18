@@ -1,88 +1,70 @@
-# Skills v2 设计说明
+# Skills v2 Design Notes
 
-本目录保存第二版低交互复现 skills。设计从“多个平级规则文件”调整为“一个总控 skill + 多个外接小 skill”。
+This folder contains the English version of the v2 low-interaction reproduction skills. The structure is changed from several peer rule files into one master skill plus several external sub-skills.
 
-## 总分结构
+## Master/Sub-Skill Structure
 
-- `reproduction-master.md`：总控 skill，负责阶段流程、门禁、路由、验收。
-- `paper-repo-reproduction.md`：小 skill，负责仓库扫描、官方入口识别、复现流程。
-- `low-interaction-agent.md`：小 skill，负责低交互策略、进度反馈、停止条件。
-- `gpu-and-checkpoint-handling.md`：小 skill，负责 GPU、CUDA、checkpoint、HuggingFace cache 和数据下载。
-- `metric-extraction.md`：小 skill，负责指标抽取、表格生成和结果校验。
+- `reproduction-master.md`: master skill for stages, gates, routing, and acceptance.
+- `paper-repo-reproduction.md`: sub-skill for repository scanning, official entrypoint discovery, and reproduction workflow.
+- `low-interaction-agent.md`: sub-skill for low-interaction behavior, progress updates, and stop conditions.
+- `gpu-and-checkpoint-handling.md`: sub-skill for GPU, CUDA, checkpoints, HuggingFace cache, and dataset download.
+- `metric-extraction.md`: sub-skill for metric extraction, table generation, and result validation.
 
-## 借鉴思想
+## Design Idea
 
-参考 `phd-skills` 的组织方式：总控文件只保留阶段和门禁，具体能力拆到独立 skill。这样 prompt 更短，也更容易在不同 repo 间复用。
+This design follows the same pattern as `phd-skills`: the master file keeps only stages and gates, while concrete capabilities live in separate sub-skills. This keeps prompts shorter and makes the workflow reusable across repositories.
 
-## 使用方式
+## How To Use In A Prompt
 
-在 repo prompt 中优先引用：
-
-```text
-D:\vLLM1\skills\reproduction-master.md
-```
-
-然后要求 agent 按总控流程，在对应阶段读取需要的小 skill。不要把所有 skill 全文直接塞进 prompt。
-
-## Prompt 调用模板
-
-在给 agent 的 repo prompt 里，可以直接加入下面这一段：
+In a repo-specific prompt, first reference:
 
 ```text
-请使用本地 skills v2 执行本次论文仓库复现任务。
-
-先读取总控 skill：
-D:\vLLM1\skills\reproduction-master.md
-
-然后按照总控流程，在对应阶段按需读取以下小 skill：
-D:\vLLM1\skills\paper-repo-reproduction.md
-D:\vLLM1\skills\low-interaction-agent.md
-D:\vLLM1\skills\gpu-and-checkpoint-handling.md
-D:\vLLM1\skills\metric-extraction.md
-
-执行规则：
-1. 不要把所有 skill 全文复制进回答，只在需要时读取对应文件。
-2. 先做 repo scan、environment gate、resource gate、smoke gate，再跑目标评测。
-3. 尽量少问用户；只有缺权限、缺 token、需要切换硬件、需要删除非临时文件、或必须修改被禁止修改的原仓库代码时才停下来。
-4. 长任务必须用 `[扫描]`、`[环境]`、`[模型]`、`[数据]`、`[评测]`、`[指标]`、`[提交]` 这种格式给简短进度。
-5. 最终生成 `reproduction.md` 和 `conversation_history/history.md`。
+D:\vLLM1\skills_en\reproduction-master.md
 ```
 
-如果是 MuQ-Eval，可以在模板后面追加 task card：
+Then instruct the agent to read the required sub-skill only when the corresponding stage needs it. Do not paste all skill files into the prompt.
+
+## Prompt Invocation Template
 
 ```text
-Task card:
-- GitHub: https://github.com/dgtql/MuQ-Eval
-- Local repo: D:\vLLM1\model\MuQ-Eval
-- Benchmark: MusicEval
-- Dataset: BAAI/MusicEval
-- Checkpoint: zhudi2825/MuQ-Eval-A1
-- Method: A1 (Frozen+MSE) [recommended]
-- Metrics: System SRCC, Utterance SRCC
-- Output table: D:\vLLM1\submission\MuQ-Eval\reproduction.md
-- History: D:\vLLM1\submission\MuQ-Eval\conversation_history\history.md
-- Do not modify original repo code.
+Use the local skills v2 workflow for this paper-repository reproduction task.
+
+First read the master skill:
+D:\vLLM1\skills_en\reproduction-master.md
+
+Then, following the master workflow, read these sub-skills only when needed:
+D:\vLLM1\skills_en\paper-repo-reproduction.md
+D:\vLLM1\skills_en\low-interaction-agent.md
+D:\vLLM1\skills_en\gpu-and-checkpoint-handling.md
+D:\vLLM1\skills_en\metric-extraction.md
+
+Execution rules:
+1. Do not copy the full skill text into the response; load the corresponding file when needed.
+2. Run repo scan, environment gate, resource gate, and smoke gate before the target evaluation.
+3. Minimize user questions. Stop only when credentials, hardware changes, non-temporary deletion, or prohibited source-code edits are required.
+4. For long tasks, provide short progress updates with tags such as [scan], [env], [model], [data], [eval], [metrics], and [submit].
+5. Generate `reproduction.md` and `conversation_history/history.md`.
 ```
 
-## Repo 细节
+## Repo-Specific Details
 
-通用规则留在 skills，具体 repo 信息放在 task card 或 prompt，例如：
+Keep general rules in skills. Put repo-specific information in the task card or prompt, such as:
 
-- GitHub URL；
-- benchmark；
-- dataset；
-- checkpoint；
-- 目标指标；
-- 是否允许修改原仓库代码；
-- 输出文件路径。
+- GitHub URL;
+- benchmark;
+- dataset;
+- checkpoint;
+- target metrics;
+- whether source-code edits are allowed;
+- output file paths.
 
-## 最终产物
+## Final Artifacts
 
-每个 repo 至少生成：
+Each repo should produce at least:
 
 ```text
 submission/<repo>/reproduction.md
 submission/<repo>/conversation_history/history.md
 ```
 
-`reproduction.md` 只放结果表格；命令、错误、修复、数据来源和交互次数写入 history。
+`reproduction.md` contains only the result table. Commands, errors, fixes, data sources, and interaction counts go into history.

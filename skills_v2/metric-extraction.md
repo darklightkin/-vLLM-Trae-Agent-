@@ -1,43 +1,43 @@
 # metric-extraction v2
 
-## 职责
+## Responsibility
 
-负责从真实运行产物中抽取目标指标，并生成提交用 Markdown 表格。它只处理“指标可信提取”和“表格格式”，不解释复现过程。
+Extract target metrics from real run artifacts and generate the submission Markdown table. This skill handles metric trustworthiness and table format only; it does not explain the reproduction process.
 
-## 输入来源
+## Input Sources
 
-优先级从高到低：
+Priority order:
 
-1. 目标 run 的 JSON/CSV 结果文件；
-2. 目标 run 的 stdout/stderr log；
-3. 官方 eval script 输出；
-4. README/paper 参考值。
+1. JSON/CSV result file from the target run;
+2. stdout/stderr log from the target run;
+3. official eval script output;
+4. README/paper reference value.
 
-README/paper 参考值只能标为 reference，不能伪装成本地 run 结果。
+README/paper reference values may be labeled as reference values, but must not be presented as local run results.
 
-## 匹配规则
+## Matching Rules
 
-抽取指标前必须确认 run 匹配：
+Before extracting metrics, confirm the run matches:
 
-- repo；
-- benchmark；
-- model/method；
-- checkpoint；
-- fold 或 setting；
-- dataset split；
-- 运行时间和输出路径。
+- repository;
+- benchmark;
+- model/method;
+- checkpoint;
+- fold or setting;
+- dataset split;
+- run time and output path.
 
-多个 run 同时存在时，选择最符合任务要求的 run；不要混合不同 run 的单元格。
+When multiple runs exist, use the one that best matches the task. Do not mix cells from different runs.
 
-## 表格规则
+## Table Rules
 
-最终文件名默认：
+Default final filename:
 
 ```text
 reproduction.md
 ```
 
-文件内容只允许 Markdown 表格：
+The file may contain only a Markdown table:
 
 ```markdown
 | Method | System SRCC | Utterance SRCC |
@@ -45,21 +45,21 @@ reproduction.md
 | A1 (Frozen+MSE) [recommended] | <value> | <value> |
 ```
 
-不要写命令、解释、截图、来源说明或 “注：”。这些内容放到 history。
+Do not include commands, explanations, screenshots, provenance notes, or “Note:”. Put those in history.
 
-## 数值规则
+## Numeric Rules
 
-- 保留任务要求的小数位；如果没有要求，默认 3 位小数。
-- 不要为了达标四舍五入到误导程度。
-- 如果指标缺失，写清 blocker，不要填猜测值。
-- 如果是单 fold、subset、CPU smoke 等非完整复现，表格仍可写真实值，但 history 必须说明限制。
+- Use the decimal precision required by the task; if unspecified, default to 3 decimals.
+- Do not round in a misleading way to appear successful.
+- If a metric is missing, write a clear blocker instead of guessing.
+- If the run is single-fold, subset, CPU smoke, or otherwise incomplete, the table may still report the real value, but history must explain the limitation.
 
-## 验收
+## Acceptance
 
-提交前确认：
+Before submission, confirm:
 
-- 每个单元格都能追溯到原始文件；
-- 没有 placeholder；
-- 表格列名和任务要求一致；
-- 原始日志和 JSON/CSV 不写进 `reproduction.md`；
-- history 中记录了指标来源路径。
+- every cell traces back to a raw file;
+- no placeholder remains;
+- table column names match the task;
+- raw logs and JSON/CSV are not embedded in `reproduction.md`;
+- history records metric source paths.

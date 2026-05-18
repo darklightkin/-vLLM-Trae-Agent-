@@ -1,43 +1,43 @@
 # gpu-and-checkpoint-handling v2
 
-## 职责
+## Responsibility
 
-负责硬件、CUDA、checkpoint、HuggingFace cache、数据下载和显存降级。它不决定最终指标，只保证资源准备过程可靠且可追溯。
+Handle hardware, CUDA, checkpoints, HuggingFace cache, dataset download, and memory fallback. This skill does not decide final metrics; it ensures resource preparation is reliable and traceable.
 
-## 环境预检查
+## Environment Preflight
 
-记录以下结果：
+Record:
 
-- `nvidia-smi`；
-- Python 路径和版本；
-- PyTorch 版本；
-- `torch.cuda.is_available()`；
-- CUDA/cuDNN 版本；
-- 可用磁盘空间；
-- 代理变量；
-- HuggingFace cache 路径。
+- `nvidia-smi`;
+- Python path and version;
+- PyTorch version;
+- `torch.cuda.is_available()`;
+- CUDA/cuDNN version;
+- free disk space;
+- proxy variables;
+- HuggingFace cache paths.
 
-如果 CUDA 不可用，明确记录 `CUDA unavailable`，并只用 CPU 做 smoke、单 fold 或小样本评测。
+If CUDA is unavailable, explicitly record `CUDA unavailable`, and use CPU only for smoke, single-fold, or small-sample evaluation.
 
-## Checkpoint 规则
+## Checkpoint Rules
 
-- 优先作者提供 checkpoint，不重新训练。
-- 从 README、paper、HF model card 或 release 中确认来源。
-- 下载到官方脚本期望的位置，或用 wrapper 指向实际路径。
-- 如果官方脚本需要 fold 目录，只创建真实存在的 fold。
-- 不要把一个 fold 的 checkpoint 复制成多个 fold，除非任务明确允许。
-- history 记录 checkpoint repo、文件名、本地路径、hash 或大小。
+- Prefer author-provided checkpoints over retraining.
+- Confirm the source from README, paper, HF model card, or release.
+- Download to the path expected by the official script, or use a wrapper to point to the actual path.
+- If the official script expects fold directories, create only folds that truly exist.
+- Do not copy one fold checkpoint into multiple folds unless the task explicitly allows it.
+- Record checkpoint repo, filename, local path, hash or size in history.
 
-## Dataset 规则
+## Dataset Rules
 
-- 优先用 HuggingFace `datasets` 或官方下载脚本。
-- 记录 dataset ID、split、样本数探测、cache 路径。
-- 不伪造样本，不用随机数据冒充 benchmark。
-- 如果数据 gated/private，停止并说明需要的权限或 token。
+- Prefer HuggingFace `datasets` or the official download script.
+- Record dataset ID, split, sample-count probe, and cache path.
+- Do not fabricate samples or use random data as a benchmark.
+- If data is gated/private, stop and report the required permission or token.
 
 ## HuggingFace Cache
 
-优先使用 workspace 或 repo-local cache，例如：
+Prefer workspace or repo-local cache, for example:
 
 ```powershell
 $env:HF_HOME='<workspace>\outputs\hf_cache'
@@ -45,40 +45,40 @@ $env:HF_HUB_CACHE='<workspace>\outputs\hf_cache\hub'
 $env:HF_DATASETS_CACHE='<workspace>\outputs\hf_cache\datasets'
 ```
 
-不要把 token 写入文件、prompt、表格或 history。
+Do not write tokens into files, prompts, tables, or history.
 
-## OOM 和降级
+## OOM and Fallback
 
-遇到 CUDA OOM 时按顺序尝试：
+When CUDA OOM occurs, try in order:
 
-1. 降低 batch size；
-2. 单 fold / 单配置；
-3. fp16/bf16 或关闭非必要加速；
-4. CPU smoke；
-5. 报告需要更大 GPU。
+1. lower batch size;
+2. single fold / single config;
+3. fp16/bf16 or disabling non-essential acceleration;
+4. CPU smoke;
+5. report that a larger GPU is required.
 
-`flash-attn`、自定义 CUDA extension 编译失败，归类为环境 blocker，不归类为模型失败。
+Treat `flash-attn` and custom CUDA extension build failures as environment blockers, not model failures.
 
-## 清理策略
+## Cleanup Policy
 
-可以自动删除 workspace 内明显临时的失败缓存：
+The agent may automatically delete obvious temporary failed-cache files inside the workspace:
 
 - `*.tmp`
 - `*.incomplete`
 - `__pycache__/`
 - `.pytest_cache/`
-- repo-local cache 下的部分下载残留
+- partial download residue under repo-local cache
 
-必须询问后才能删除：
+Ask before deleting:
 
-- 源码、配置、脚本、README；
-- checkpoint：`*.pt`、`*.pth`、`*.ckpt`、`*.safetensors`；
-- 数据集原始文件、标注、图片、音频；
-- submission 或 conversation history；
-- workspace 外路径。
+- source code, configs, scripts, README;
+- checkpoints: `*.pt`, `*.pth`, `*.ckpt`, `*.safetensors`;
+- raw dataset files, annotations, images, audio;
+- submission or conversation history;
+- paths outside the workspace.
 
-自动清理时只发状态：
+When automatic cleanup is used, report only a status update:
 
 ```text
-[清理] 删除 repo-local cache 中失败下载的临时文件；下一步重新探测数据集。
+[cleanup] Removed failed temporary files from repo-local cache; next step is to probe the dataset again.
 ```
