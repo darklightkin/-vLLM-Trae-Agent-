@@ -19,20 +19,58 @@
 
 ### 1. Intake
 
+默认 prompt 会提供 GitHub URL。把 GitHub URL 作为任务主入口，本地路径只作为可选覆盖项。
+
 确认任务卡中至少包含：
 
-- GitHub URL 或本地 repo 路径；
+- GitHub URL；
 - 目标 benchmark；
 - 目标模型或方法；
 - 目标指标；
 - 提交文件格式；
 - 是否允许修改原仓库代码。
 
-如果缺字段，先从 README、paper、configs、scripts 中自动补齐；只有无法推断时才问用户。
+如果没有提供本地路径，根据 GitHub repo 名自动推导：
+
+```text
+<workspace>/model/<repo-name>
+```
+
+例如：
+
+```text
+GitHub: https://github.com/dgtql/MuQ-Eval
+Local repo: D:\vLLM1\model\MuQ-Eval
+```
+
+如果缺 benchmark、dataset、checkpoint、metric 等字段，先 clone/读取 README、paper、configs、scripts 自动补齐；只有无法推断时才问用户。
 
 ### 2. Repo Bootstrap
 
-如果本地没有仓库，从 GitHub clone。若仓库已存在，先检查 `git status --short` 和 `git remote -v`，不要覆盖用户已有文件。
+从 GitHub URL 启动仓库准备：
+
+1. 解析 repo 名，推导默认本地目录。
+2. 如果本地目录不存在，从 GitHub clone。
+3. 如果本地目录已存在，先检查 `git status --short` 和 `git remote -v`。
+4. 如果 existing remote 与 prompt 的 GitHub URL 不匹配，不要覆盖，停止并报告路径冲突。
+5. 如果 remote 匹配，继续使用已有目录，不要删除用户改动。
+
+推荐命令形态：
+
+```powershell
+cd <workspace>
+New-Item -ItemType Directory -Force model | Out-Null
+git clone <github-url> model\<repo-name>
+cd model\<repo-name>
+```
+
+已存在时：
+
+```powershell
+cd <workspace>\model\<repo-name>
+git status --short
+git remote -v
+```
 
 输出一个最小 inventory：
 
