@@ -8,6 +8,8 @@
 
 方案借鉴 MLEvolve 的 experience-driven memory 思想：不是把所有运行日志无限追加进 prompt，而是让 agent 在真实执行、失败修复和指标验证中产生经验摘要，再由人工审核压缩为最终版 final skill pack。最终 skill 是“人工先验 + agent 执行反馈 + 日志复盘 + 经验压缩”的结果，用来帮助后续 repo 复现减少交互轮次。
 
+skill 演化是 agent-assisted，而不是 fully autonomous。agent 根据日志和 conversation history 生成候选经验规则，人负责审核、压缩和定稿，避免一次性细节、错误因果和冗长历史污染 final skill pack。
+
 ## Key Design
 
 核心评价口径：
@@ -103,6 +105,59 @@ Repo Scan
 - `low-interaction-agent`：减少澄清问题，安全默认决策；
 - `metric-extraction`：从 logs/json/csv 中抽取红圈指标并生成只含表格的 md；
 - `gpu-and-checkpoint-handling`：GPU 选择、模型下载、断点缓存、显存不足降级。
+
+### Skill 写法参考
+
+本方案的 skill 文件可以参考 `phd-skills` 项目中的 reproduce skill 结构：
+
+```text
+name / description
+  -> skill 总目标
+  -> When to run
+  -> Workflow
+  -> Working directory layout
+  -> Cross-references
+  -> Output
+```
+
+借鉴点：
+
+- `When to run`：明确 skill 触发条件，避免 agent 乱用或漏用；
+- `Workflow`：把复现拆成阶段，并要求前一阶段通过后再进入下一阶段；
+- `Working directory layout`：统一保存结果、日志、history 和 case note；
+- `Output`：明确最终产物格式和成功标准。
+
+但不能照搬该 reproduce skill 的内容，因为它主要面向“从论文零开始复现”，包括没有官方代码时补实现、补超参、找替代数据集等场景。本项目的目标是“已有官方 repo 的低交互指标复现”，所以 skill 内容要定制为：
+
+- 优先使用官方 repo、官方 eval script 和作者提供模型；
+- 重点处理环境配置、GPU/checkpoint、数据路径、评测入口和指标抽取；
+- 不把“从零实现论文”作为主流程；
+- 不把长篇论文解析、训练脚本补全、私有数据集替代作为默认能力；
+- 最终输出以 `result.md` 指标表格和完整 `conversation_history` 为核心。
+
+推荐的本地 skill 基本结构：
+
+```text
+~/.codex/skills/<skill-name>/
+  SKILL.md
+```
+
+每个 `SKILL.md` 至少包含：
+
+```text
+---
+name: <skill-name>
+description: <when this skill should be used>
+---
+
+# <Skill Title>
+
+## When to run
+
+## Workflow / Rules
+
+## Output
+```
 
 ### Skill 能力描述
 
