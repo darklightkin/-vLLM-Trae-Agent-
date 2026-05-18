@@ -32,16 +32,6 @@ Confirm that the task card contains at least:
 
 If no local path is provided, infer it from the GitHub repository name:
 
-```text
-<workspace>/model/<repo-name>
-```
-
-Example:
-
-```text
-GitHub: https://github.com/dgtql/MuQ-Eval
-Local repo: D:\vLLM1\model\MuQ-Eval
-```
 
 If benchmark, dataset, checkpoint, or metrics are missing, clone/read README, paper, configs, and scripts first. Ask the user only when the missing field cannot be inferred safely.
 
