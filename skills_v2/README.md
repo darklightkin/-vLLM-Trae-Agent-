@@ -24,6 +24,46 @@ D:\vLLM1\skills\reproduction-master.md
 
 然后要求 agent 按总控流程，在对应阶段读取需要的小 skill。不要把所有 skill 全文直接塞进 prompt。
 
+## Prompt 调用模板
+
+在给 agent 的 repo prompt 里，可以直接加入下面这一段：
+
+```text
+请使用本地 skills v2 执行本次论文仓库复现任务。
+
+先读取总控 skill：
+D:\vLLM1\skills\reproduction-master.md
+
+然后按照总控流程，在对应阶段按需读取以下小 skill：
+D:\vLLM1\skills\paper-repo-reproduction.md
+D:\vLLM1\skills\low-interaction-agent.md
+D:\vLLM1\skills\gpu-and-checkpoint-handling.md
+D:\vLLM1\skills\metric-extraction.md
+
+执行规则：
+1. 不要把所有 skill 全文复制进回答，只在需要时读取对应文件。
+2. 先做 repo scan、environment gate、resource gate、smoke gate，再跑目标评测。
+3. 尽量少问用户；只有缺权限、缺 token、需要切换硬件、需要删除非临时文件、或必须修改被禁止修改的原仓库代码时才停下来。
+4. 长任务必须用 `[扫描]`、`[环境]`、`[模型]`、`[数据]`、`[评测]`、`[指标]`、`[提交]` 这种格式给简短进度。
+5. 最终生成 `reproduction.md` 和 `conversation_history/history.md`。
+```
+
+如果是 MuQ-Eval，可以在模板后面追加 task card：
+
+```text
+Task card:
+- GitHub: https://github.com/dgtql/MuQ-Eval
+- Local repo: D:\vLLM1\model\MuQ-Eval
+- Benchmark: MusicEval
+- Dataset: BAAI/MusicEval
+- Checkpoint: zhudi2825/MuQ-Eval-A1
+- Method: A1 (Frozen+MSE) [recommended]
+- Metrics: System SRCC, Utterance SRCC
+- Output table: D:\vLLM1\submission\MuQ-Eval\reproduction.md
+- History: D:\vLLM1\submission\MuQ-Eval\conversation_history\history.md
+- Do not modify original repo code.
+```
+
 ## Repo 细节
 
 通用规则留在 skills，具体 repo 信息放在 task card 或 prompt，例如：
