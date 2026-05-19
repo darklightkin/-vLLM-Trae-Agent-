@@ -6,6 +6,8 @@
 
 ## Environment gate
 
+安装pytorch环境默认先使用清华源https://pypi.tuna.tsinghua.edu.cn/simple/
+
 记录：
 
 - 仓库要求的 Python version；
@@ -82,7 +84,9 @@ pip install -r requirements.txt
 GPU PyTorch 的推荐安装方式：
 
 ```bash
-conda install -y pytorch torchaudio pytorch-cuda=12.1 -c pytorch -c nvidia
+conda install -y pytorch torchaudio pytorch-cuda=12.1 \
+  -c https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/pytorch \
+  -c https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/nvidia
 ```
 
 Validation command：
@@ -181,24 +185,4 @@ Verify：
 
 在 `change_summary.md` 中记录 expected vs actual values。保留 official model 和 method names 的准确写法。
 
-## Cleanup policy
 
-无需询问即可删除：
-
-- workspace-local `*.tmp`；
-- workspace-local `*.incomplete`；
-- `__pycache__/`；
-- `.pytest_cache/`；
-- repo-local cache 下失败的 partial downloads。
-
-删除以下内容前必须询问：
-
-- source code；
-- configs；
-- scripts；
-- README；
-- checkpoints；
-- raw datasets；
-- submission files；
-- conversation history；
-- workspace 外路径。
