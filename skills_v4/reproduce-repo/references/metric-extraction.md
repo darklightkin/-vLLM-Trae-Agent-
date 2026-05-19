@@ -1,10 +1,12 @@
-# Metric Extraction
+# Metric Extraction and Submission Reference
 
 ## Responsibility
 
-Extract final metrics from real local artifacts, enforce provenance, generate `result.md`, and write `run_summary.json`.
+Extract metrics from real artifacts, enforce provenance, write fixed `result.md`, and preserve raw `history.md` as the benchmark interaction trace.
 
-## Run Classification
+## Run classification
+
+Every run that produces metrics must be classified:
 
 | Run type | Meaning | Can feed result.md |
 | --- | --- | --- |
@@ -14,22 +16,26 @@ Extract final metrics from real local artifacts, enforce provenance, generate `r
 | `official_table` | README or paper reference value | No |
 | `blocked` | no valid local metric produced | No |
 
-## Metric Provenance
+## Metric provenance table
 
-Every metric considered for final output must record:
+For each final metric, record provenance in work logs or raw trace artifacts:
 
-- metric name;
-- value;
-- source file;
-- source key, CSV column, or log line;
-- run type;
-- split/fold;
-- whether it came from local execution;
-- command that produced it when available.
+| Metric | Value | Source file | Source key/line | Run type | Split/fold | Local execution? |
+| --- | --- | --- | --- | --- | --- | --- |
 
-Only local `submission` metrics may populate `result.md`.
+Allowed split/fold values include:
 
-## result.md Rules
+- `test`;
+- `validation`;
+- `train`;
+- `all`;
+- `fold0`, `fold1`, etc.;
+- `5-fold`;
+- `unknown`.
+
+If the source is `all`, `smoke`, `diagnostic`, or `official_table`, do not use it in `result.md` unless the task explicitly says so.
+
+## result.md rules
 
 Final filename is fixed:
 
@@ -40,50 +46,44 @@ result.md
 Content must be only a Markdown table:
 
 ```markdown
-| Method | Metric |
-| --- | --- |
-| <method> | <value> |
+| Method | Metric 1 | Metric 2 |
+| --- | --- | --- |
+| <method> | <value> | <value> |
 ```
 
-No notes, commands, screenshots, logs, or provenance text.
+No notes, commands, provenance, screenshots, or explanations.
 
-## run_summary.json
+## history.md raw trace rule
 
-Create:
+`history.md` is not a report template. It must be the complete raw Codex conversation record for the run.
 
-```text
-conversation_history/run_summary.json
-```
+It must include, as originally recorded:
 
-Schema:
+- user inputs;
+- assistant replies;
+- tool calls;
+- command execution records;
+- errors and repair attempts;
+- metric extraction process.
 
-```json
-{
-  "repo_name": "",
-  "success": false,
-  "failure": null,
-  "human_turns": 1,
-  "repair_attempts": 0,
-  "smoke_runs": 0,
-  "final_metric": null,
-  "metric_source": null,
-  "smallest_success_model": "unknown",
-  "environment_name": null,
-  "dataset_downloaded": false,
-  "checkpoint_used": false
-}
-```
+Forbidden:
 
-## Final Submission Directory
+- replacing history with a summary;
+- replacing history with a reproduction report;
+- rewriting, compressing, beautifying, filtering, or reorganizing the raw conversation;
+- keeping only assistant output;
+- fabricating conversation history.
 
-The final directory must contain only:
+Metric provenance can be visible in the raw trace and internal logs, but do not convert `history.md` into a polished provenance report.
+
+## Final submission directory
+
+Final package directory must contain only:
 
 ```text
 repo_name/
   result.md
-  conversation_history/
+  history.md
 ```
 
-Keep raw logs, JSON, CSV, checkpoints, caches, wrappers, scripts, and temp files in the work directory, not the final submission directory.
-
-`conversation_history/history.md`, when required, must be the original Codex conversation trace, not a metric provenance report, command summary, or rewritten reproduction narrative. Metric provenance belongs in raw artifacts or work logs unless the benchmark explicitly requires it inside the preserved trace.
+Do not include raw checkpoints, datasets, cache, raw JSONL, scripts, outputs, logs, or work files in the final submission directory unless the user explicitly requires them.

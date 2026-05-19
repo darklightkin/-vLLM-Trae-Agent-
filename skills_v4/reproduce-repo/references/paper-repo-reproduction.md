@@ -1,36 +1,35 @@
-# Paper Repo Reproduction
+# Paper Repo Reproduction Reference
 
 ## Responsibility
 
-Scan the repository, identify the official reproduction target, choose the smallest valid run, and keep the process traceable.
+Handle repository-level reproduction: scan official materials, identify targets, find the official entrypoint, build an inventory, choose the smallest valid run, and keep the process traceable.
 
-## Repo Scan
+## Repo scan
 
-Read before heavy execution:
+Read before running heavy commands:
 
 - README and reproduction docs;
-- requirements, environment files, and lockfiles;
+- requirements and environment files;
 - configs;
-- train, eval, inference, benchmark, and test scripts;
+- train/eval/infer scripts;
 - examples and shell scripts;
 - paper/table references;
-- releases, model cards, and issues when needed;
-- local outputs, logs, and prior history files.
+- issues or model cards when local docs are incomplete.
 
 Build an inventory:
 
 | Component | What to find |
 | --- | --- |
-| README | official instructions and target table |
-| environment | Python, torch, CUDA, special packages |
-| configs | model, benchmark, split, batch size |
-| eval entrypoint | official command and arguments |
-| dataset | dataset ID/path, split, schema, estimated size |
-| checkpoint | source, files, size, fold layout |
-| metrics | JSON/CSV/log outputs and metric names |
-| submission | required final directory structure |
+| README | official reproduction instructions and target table |
+| requirements | Python, CUDA, torch, flash-attn, vLLM, special packages |
+| configs | target model, benchmark, split, batch size |
+| eval entrypoint | official evaluation script and arguments |
+| dataset | dataset ID, local path, split, schema, estimated size, minimal subset |
+| checkpoint | pretrained/author checkpoint source, file names, size, fold layout |
+| metrics | JSON/CSV/log output and metric names |
+| submission | required file name and directory structure |
 
-## Target Identification
+## Target identification
 
 Confirm:
 
@@ -39,42 +38,53 @@ Confirm:
 - target row and columns;
 - target split/fold protocol;
 - accepted tolerance;
-- whether inference-only, one fold, all folds, or full benchmark is required.
+- whether one round, one fold, or full 5-fold is required.
 
-If README and task card disagree, prefer explicit user/task-card submission requirements and record the discrepancy in work logs.
+If README and task card disagree, prefer the task card for submission requirements and record the discrepancy in history.
 
-## Official Entrypoint
+## Workflow
 
-Prefer official commands in this order:
+1. Read docs and scripts.
+2. Identify official eval command.
+3. Search for author-provided pretrained checkpoints or model weights.
+4. Prefer checkpoint-based evaluation or inference reproduction.
+5. Identify smallest target-equivalent evaluation subset.
+6. Estimate dataset size and check disk before any dataset download.
+7. Run smoke first.
+8. Run target submission evaluation.
+9. Train only if no checkpoint exists, evaluation cannot be completed otherwise, and training is required.
+10. Route failures to bounded recovery.
+11. Route outputs to metric extraction.
+12. Package `result.md` and raw `history.md`.
 
-1. documented evaluation command;
-2. benchmark script;
-3. inference script plus official metric script;
-4. test script that exercises the official metric;
-5. wrapper around official functions.
+## Checkpoint-first policy
 
-Do not reimplement metrics unless official metric code is unavailable or broken beyond repair.
+- If pretrained checkpoints are available, prioritize checkpoint-based evaluation or inference reproduction over full training reproduction.
+- Do not choose a training entrypoint while an official checkpoint evaluation path exists.
+- Do not download complete training datasets before checkpoint discovery.
+- If a checkpoint link is broken or gated, record that blocker before considering training as a fallback.
 
-Do not choose a training entrypoint while a checkpoint/pretrained-weight evaluation entrypoint is available. Training is a gated fallback, not the default reproduction path.
+## Dataset and training policy
 
-## Wrapper Policy
+- Do not default to full dataset download.
+- Do not default to full or long training.
+- If dataset download is necessary, estimate size, check free disk, prefer the smallest necessary subset, and make the reason visible in logs or the raw history trace.
+- Treat full training as a last resort, not the standard reproduction path.
 
-Default: avoid upstream source edits.
+## Source-code and wrapper policy
 
-A wrapper may:
+- Default: do not modify upstream repo code.
+- If official code is incompatible with offline/local resources, prefer an external wrapper.
+- A wrapper may adapt paths, merge configs, set cache variables, or call existing model/metric functions.
+- A wrapper must not change benchmark semantics, labels, splits, or metric formulas.
+- Record:
 
-- set paths and cache variables;
-- adapt CLI arguments;
-- select minimal subsets for smoke tests;
-- call official model and metric functions;
-- normalize checkpoint paths.
+```text
+Original repo modified: Yes/No
+Wrapper script added: Yes/No
+Wrapper reason: <reason>
+```
 
-A wrapper must not:
+## Lessons from history_v1
 
-- change labels;
-- change splits;
-- change metric formulas;
-- change model architecture;
-- silently skip failed samples for final metrics.
-
-Record whether source was modified and why.
+The MuQ-Eval v1 run showed good behavior by using an external wrapper instead of patching upstream code. The missing piece was final packaging and history preservation. Future runs must package only `result.md` and raw `history.md`; `history.md` must be the original Codex interaction trace, not a cleaned reproduction report.

@@ -1,154 +1,149 @@
 ---
 name: reproduce-repo
-description: Use when the user asks to reproduce paper repository results, benchmark tables, evaluation metrics, or scientific GitHub repositories with low human interaction, including repo exploration, isolated environment creation, dependency repair, checkpoint-first reproduction, minimal dataset handling, smoke tests, benchmark evaluation, metric extraction, final result packaging, run summary generation, and complete Codex conversation history preservation.
+description: Use when the user provides a GitHub repository URL, local repository path, paper repository, benchmark repository, offline reproduction bundle, or asks to reproduce paper/table/benchmark results with low human interaction. This skill covers repo scanning, target metric identification, fresh isolated conda or venv setup, dependency repair, checkpoint-first evaluation or inference reproduction, minimal dataset handling, smoke testing, bounded failure recovery, metric provenance checks, fixed result.md generation, and raw Codex history.md preservation. Trigger this skill for failure modes including missing dependencies, broken Python or torch environments, CUDA OOM, checkpoint layout mismatch, dataset schema mismatch, missing metric files, official script interface drift, and ambiguous final submission results.
 ---
 
 # Reproduce Repo
 
 ## Purpose
 
-Reproduce a paper repository, benchmark row, table result, or evaluation metric with minimal human interaction, isolated execution, and auditable outputs.
+Reproduce a target paper, table, or benchmark result from a repository with minimal human interaction and complete auditability.
 
-This is the only triggerable skill entrypoint. Load reference files only when their stage is active.
+This is the master skill. Keep it as the triggerable entrypoint. Load the reference files only when their stage is needed.
 
-## Core Defaults
+## When to use
 
-- Create a fresh isolated environment for each repo by default.
-- Prefer conda. Fall back to venv only when conda is unavailable.
-- Do not reuse existing conda/venv environments unless the user explicitly requests reuse.
-- Do not use `base`, system Python, a previous repo environment, or any discovered old environment as an automatic fallback.
-- Prefer author checkpoints, inference-only reproduction, minimal evaluation subsets, smoke tests, and benchmark evaluation.
-- If pretrained checkpoints are available, the agent must prioritize checkpoint-based evaluation reproduction over full training reproduction.
-- Do not default to full training, TB-scale downloads, or long-running training.
-- Ask fewer questions: infer from repository artifacts whenever safe.
-- Preserve the real Codex conversation history. `history.md` must preserve the original Codex conversation trace instead of a rewritten or summarized reproduction report.
-- Final submission directory contains only `result.md` and `conversation_history/`.
+Use after the YAML `description` triggers when the user:
 
-## Required Workflow
+- provides a GitHub URL or local repository path;
+- points to an offline paper-repo bundle;
+- asks to reproduce a benchmark, table, result, model row, or README metric;
+- asks for `result.md`, raw `history.md`, or a low-interaction reproduction;
+- pastes logs from a failed reproduction and wants the agent to continue.
 
-1. Scan repository docs, scripts, configs, model cards, examples, issues, and papers before heavy execution.
-2. Identify the target benchmark, method, checkpoint, split, metric, and official entrypoint.
-3. Create a fresh repo-specific isolated environment.
-4. Install dependencies inside that environment only.
-5. Find and prepare author checkpoints or pretrained weights before dataset-heavy work.
-6. Prefer checkpoint-based inference/evaluation reproduction.
-7. Estimate dataset size and check disk before any dataset download; use the smallest valid evaluation subset first.
-8. Run smoke tests before benchmark evaluation.
-9. Run benchmark evaluation only after the environment, checkpoint, and data gates pass.
-10. Train only when no checkpoint is available and evaluation cannot be completed, or when official instructions/user request explicitly require training.
-11. Attempt bounded automatic repairs without changing benchmark semantics.
-12. Extract metrics only from real local artifacts with provenance.
-13. Create the final submission directory with only:
+Do not use this skill for unrelated code review or ordinary feature development unless it is part of a reproduction workflow.
+
+## Inputs
+
+Expected inputs:
+
+- GitHub URL or local repo path;
+- paper URL or target table/README row;
+- benchmark name;
+- model/method/checkpoint target;
+- dataset target or offline resource path;
+- target metrics and accepted tolerance;
+- hardware constraints;
+- whether source-code edits are allowed;
+- official submission structure.
+
+If inputs are missing, infer from README, configs, scripts, paper links, model cards, issues, local resources, and task cards before asking the user.
+
+## Outputs
+
+Final submission directory must contain only:
 
 ```text
 repo_name/
   result.md
-  conversation_history/
+  history.md
 ```
 
-`conversation_history/` must contain the complete raw Codex conversation export plus `run_summary.json`.
-`conversation_history/history.md` must be the original Codex conversation trace, including user messages, assistant messages, tool calls, repair attempts, and execution traces. It must not be a cleaned-up narrative report.
+`result.md` contains only the metric table. `history.md` contains only the raw Codex conversation trace: user messages, assistant replies, tool calls, command execution records, errors, repairs, and metric extraction process. Raw logs, JSON, CSV, checkpoints, caches, outputs, and wrapper scripts can stay in the work directory for traceability, but do not include them in the final submission directory unless the user explicitly requires them.
 
-## Reference Loading
+## Low-interaction rules
 
-Load these references when needed:
+- User interaction turns are counted by messages the user actively sends to Codex.
+- Agent scans, shell commands, progress updates, log analysis, and automatic repairs do not count as human turns.
+- Ask the user only for credentials, private data permission, paid downloads, large dataset downloads, long training runs, hardware/machine switch, system-level modifications, dangerous deletion, forbidden source edit approval, or non-temporary deletion.
+- Record every unavoidable user question as an `interaction_count_candidate`.
+- Prefer safe defaults, act automatically when inferable, and let the raw `history.md` trace show the decision process.
 
-- `references/isolated-environment-management.md`: fresh environment policy, conda/venv creation, Python inference, CUDA compatibility, naming, cleanup, cache handling.
-- `references/lightweight-reproduction-policy.md`: checkpoint-first, evaluation-first, inference-only, smoke-test-first workflow and training gate.
-- `references/dataset-download-policy.md`: dataset size estimation, disk checks, subset strategy, download thresholds, and stop conditions.
-- `references/codex-history-preservation.md`: raw conversation history requirements, forbidden pseudo-history summaries, final directory rules.
-- `references/interaction-minimization-policy.md`: necessary vs unnecessary clarification, automatic default decisions, human-turn minimization.
+## Execution workflow
+
+Follow this order:
+
+1. repo scan;
+2. paper/table/benchmark target identification;
+3. fresh isolated environment creation;
+4. dependency installation;
+5. author checkpoint or pretrained weight discovery/download;
+6. checkpoint-based evaluation or inference reproduction planning;
+7. minimal evaluation subset or smoke test;
+8. benchmark evaluation if the gates pass;
+9. training only if no checkpoint exists, evaluation cannot be completed, and training is required by the task or official instructions;
+10. failure diagnosis and repair;
+11. metric extraction;
+12. `result.md` generation;
+13. raw Codex `history.md` preservation.
+
+Do not start with a full benchmark run, full dataset download, or full training run. Pass the fresh-environment, checkpoint, dataset-size, disk-space, and smoke gates first.
+
+## Environment policy
+
+- Default: create a new isolated environment for every repo.
+- Prefer `conda create`; if conda is unavailable, create a new venv.
+- Environment names should include the repo name and a timestamp.
+- Do not default to reusing any existing conda/venv environment.
+- Do not use `base` or system Python for reproduction.
+- Do not automatically fallback to an old environment after dependency failure.
+- Reuse is allowed only when the user explicitly requests reuse of an existing environment.
+
+## Download and training policy
+
+- First look for author-provided pretrained checkpoints or model weights.
+- If pretrained checkpoints are available, prioritize checkpoint-based evaluation or inference reproduction over training.
+- Prefer the smallest valid evaluation subset or smoke test.
+- Do not default to downloading complete training datasets.
+- Do not start full or long training by default.
+- If dataset download is necessary, estimate dataset size, check disk space, prefer the smallest necessary subset, and leave the reason visible in logs or the raw history trace.
+- Training is allowed only when no usable checkpoint exists, evaluation cannot be completed without training, and the task or official instructions require training.
+
+## Safety rules
+
+- Do not write API keys, tokens, private credentials, or paid-access secrets into prompts, source files, logs, result tables, or history.
+- Do not use Docker, sudo, or dangerous recursive deletion commands.
+- Do not delete source code, configs, checkpoints, raw datasets, submission files, or conversation history.
+- Do not modify upstream repository code unless the task explicitly allows it.
+- If source edits are forbidden, use wrappers, environment variables, local config copies, or record a blocker.
+- Do not fabricate datasets, checkpoints, metrics, or paper values.
+- Do not present README or official table values as local reproduction results.
+- Do not overwrite system Python, modify system CUDA, or rely on `base`.
+
+## Required references
+
+Load as needed:
+
 - `references/paper-repo-reproduction.md`: repo scan, target identification, official entrypoint, wrapper policy.
-- `references/gpu-and-checkpoint-handling.md`: GPU, CUDA, checkpoint, cache, and resource checks.
-- `references/metric-extraction.md`: metric provenance, `result.md`, and `run_summary.json`.
+- `references/low-interaction-agent.md`: low-interaction rules, interaction counting, progress updates.
+- `references/gpu-and-checkpoint-handling.md`: fresh environment/resource gate, CUDA, checkpoint, dataset, HF cache, proxy.
+- `references/metric-extraction.md`: metric provenance, `result.md`, raw `history.md`, final submission layout.
 
-## Environment Gate
+## Metric provenance gate
 
-Before installing dependencies or running repo code:
+Every final metric must record:
 
-- infer Python version from docs, metadata, lockfiles, classifiers, Dockerfiles, CI, or import syntax;
-- create an environment named with repo name and timestamp, for example `repo-20260519-153012`;
-- record environment manager, environment name/path, Python version, torch/CUDA versions, and GPU availability;
-- treat any existing environment as read-only context, not an execution target, unless the user explicitly says to reuse that exact environment.
+- metric name;
+- numeric value;
+- source file;
+- source key, CSV column, or log line;
+- run type: `submission`, `smoke`, `diagnostic`, `official_table`, or `blocked`;
+- split: `test`, `validation`, `train`, `all`, `fold<N>`, `5-fold`, or `unknown`;
+- whether the value is from local execution or an official reference.
 
-See `references/isolated-environment-management.md`.
+Only `submission` local-execution metrics may populate `result.md`. Smoke, diagnostic, and official-table-only values cannot be submitted as reproduced results.
 
-## Data and Training Gate
+## Final deliverables
 
-Before any dataset download or training:
+`result.md`:
 
-- search for author checkpoints and official pretrained weights;
-- download or locate pretrained checkpoints before considering full training;
-- identify inference or evaluation scripts;
-- identify a minimal valid evaluation subset or smoke mode;
-- estimate download size and available disk;
-- stop before large downloads or full training unless a training gate is satisfied.
+- fixed filename;
+- Markdown table only;
+- no notes, commands, explanations, screenshots, or provenance text.
 
-Training is allowed only when:
+`history.md`:
 
-- README or official instructions explicitly require training for reproduction;
-- the user explicitly requests full training reproduction;
-- no checkpoint exists and evaluation cannot be completed otherwise.
-
-See `references/lightweight-reproduction-policy.md` and `references/dataset-download-policy.md`.
-
-## Safety Rules
-
-Never use:
-
-- Docker;
-- sudo;
-- `rm -rf`;
-- system Python overwrite;
-- system CUDA modification;
-- broad or violent cache deletion.
-
-Always:
-
-- use an isolated environment;
-- operate inside a workspace;
-- preserve logs and metric provenance;
-- avoid modifying upstream source unless needed and allowed;
-- keep checkpoints, datasets, logs, scripts, and temp files out of the final submission directory.
-
-## Run Summary
-
-Create `conversation_history/run_summary.json` with:
-
-```json
-{
-  "repo_name": "",
-  "success": false,
-  "failure": null,
-  "human_turns": 1,
-  "repair_attempts": 0,
-  "smoke_runs": 0,
-  "final_metric": null,
-  "metric_source": null,
-  "smallest_success_model": "unknown",
-  "environment_name": null,
-  "dataset_downloaded": false,
-  "checkpoint_used": false
-}
-```
-
-Definitions:
-
-- `success`: true only when `result.md` is generated from valid local benchmark/evaluation artifacts.
-- `failure`: null on success, otherwise a short blocker category.
-- `final_metric`: final submitted metric value or object.
-- `metric_source`: file path plus key, column, or log line used for the final metric.
-- `dataset_downloaded`: true when new dataset bytes were downloaded during the run.
-- `checkpoint_used`: true when a local or downloaded checkpoint was used.
-
-## Final Output Contract
-
-The final submission directory must contain only:
-
-```text
-repo_name/
-  result.md
-  conversation_history/
-```
-
-Do not place logs, checkpoints, outputs, scripts, caches, raw datasets, or temp files in the final submission directory. Keep them in the work directory for traceability.
+- fixed filename at `repo_name/history.md`;
+- complete raw Codex conversation trace;
+- includes user messages, assistant replies, tool calls, command records, errors, repair attempts, and metric extraction process;
+- no rewritten report, no summary substitute, no compressed or beautified transcript, no assistant-only transcript, no fabricated conversation history.
